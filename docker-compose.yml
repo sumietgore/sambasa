@@ -1,0 +1,46 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: sambasa-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - sambasa-network
+    depends_on:
+      - app
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: sambasa-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sambasa
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sambasa-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  sambasa-network:
+    driver: host
