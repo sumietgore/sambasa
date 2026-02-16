@@ -11,10 +11,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
-    networks:
-      - sambasa-network
-    depends_on:
-      - app
+    network_mode: host
 
   postgres:
     image: postgres:17-alpine
@@ -28,19 +25,14 @@ services:
       POSTGRES_DB: sambasa
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - sambasa-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
+    network_mode: host
 
 volumes:
   postgres_data:
   caddy_data:
   caddy_config:
-
-networks:
-  sambasa-network:
-    driver: host
