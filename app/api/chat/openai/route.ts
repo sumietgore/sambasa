@@ -1,6 +1,9 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import openai from "@/lib/providers/openai";
+import { AllModels, ModelProviders } from "@/lib/providers";
+import BotIcon from "@/components/bot-icon";
+import { ChatRequest } from "@/lib/chat";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({
@@ -11,7 +14,9 @@ export async function POST(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const { messages } = await request.json();
+  const { messages, model, provider }: ChatRequest = await request.json();
+
+  console.log(model, provider);
 
   if (!messages || !Array.isArray(messages)) {
     return new Response("Messages array is required", { status: 400 });
@@ -20,7 +25,7 @@ export async function POST(request: Request) {
   const userName = session.user.name || "User";
 
   const stream = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: model,
     messages: [
       {
         role: "system" as const,

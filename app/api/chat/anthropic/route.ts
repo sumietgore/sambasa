@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import openai from "@/lib/providers/openai";
+import anthropic from "@/lib/providers/anthropic";
+import { ChatRequest } from "@/lib/chat";
 
 export async function POST(request: Request) {
+  console.log("asd");
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -11,7 +13,9 @@ export async function POST(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const { messages } = await request.json();
+  const { messages, model, provider }: ChatRequest = await request.json();
+
+  console.log(model, provider);
 
   if (!messages || !Array.isArray(messages)) {
     return new Response("Messages array is required", { status: 400 });
@@ -19,25 +23,22 @@ export async function POST(request: Request) {
 
   const userName = session.user.name || "User";
 
-  const stream = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system" as const,
-        content: `The user's name is ${userName}. Greet them by name when appropriate.`,
-      },
-      ...messages,
-    ],
-    stream: true,
+  const stream = anthropic.messages.stream({
+    model: model,
+    max_tokens: 1024,
+    system: `The user's name is ${userName}. Greet them by name when appropriate.`,
+    messages,
   });
 
   const readableStream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content;
-        if (text) {
-          controller.enqueue(encoder.encode(text));
+        if (
+          chunk.type === "content_block_delta" &&
+          chunk.delta.type === "text_delta"
+        ) {
+          controller.enqueue(encoder.encode(chunk.delta.text));
         }
       }
       controller.close();

@@ -5,18 +5,20 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Bot, User, Loader2 } from "lucide-react";
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+import { Square, User, Loader2, ArrowUp } from "lucide-react";
+import { ModelProviders, AllModels } from "@/lib/providers";
+import ModelSelector from "@/components/model-selector";
+import { ChatMessage } from "@/lib/chat";
+import BotIcon from "@/components/bot-icon";
+import Messages from "@/components/messages";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [provider, setProvider] = useState<ModelProviders>("openai");
+  const [model, setModel] = useState<AllModels>("gpt-4.1-mini");
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -27,7 +29,12 @@ export default function DashboardPage() {
   }, [isPending, session, router]);
 
   useEffect(() => {
+    console.log(model, provider);
+  }, [model, provider]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // console.log(messages);
   }, [messages]);
 
   if (isPending)
@@ -49,10 +56,14 @@ export default function DashboardPage() {
     setIsStreaming(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch(`/api/chat/${provider}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updatedMessages }),
+        body: JSON.stringify({
+          messages: updatedMessages,
+          model: model,
+          provider: provider,
+        }),
       });
 
       if (!response.ok) {
@@ -90,78 +101,72 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen max-w-2xl mx-auto">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-        <h1 className="text-lg font-bold text-white">Sambasa Chat</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-white/70">
-            {user.name || user.email}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => signOut()}>
-            Sign Out
-          </Button>
-        </div>
-      </header>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-white/50">
-            <Bot className="w-12 h-12 mb-3" />
-            <p className="text-lg">How can I help you today?</p>
-          </div>
-        )}
-
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            {msg.role === "assistant" && (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                <Bot className="w-4 h-4" />
-              </div>
-            )}
-            <div
-              className={`max-w-[75%] rounded-lg px-4 py-2 whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {msg.content || <Loader2 className="w-4 h-4 animate-spin" />}
+    <>
+      <div className="min-h-screen flex flex-col">
+        <div className="w-full flex flex-1 flex-col h-full items-center mx-auto">
+          {/* Header */}
+          <header className="flex sticky bg-background top-0 w-full items-center justify-between px-4 py-3 border-b border-white/10">
+            <h1 className="text-lg font-bold text-white">Sambasa Chat</h1>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-white/70">
+                {user.name || user.email}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => signOut()}>
+                Sign Out
+              </Button>
             </div>
-            {msg.role === "user" && (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <User className="w-4 h-4 text-primary-foreground" />
-              </div>
-            )}
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+          </header>
 
-      {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2 px-4 py-3 border-t border-white/10"
-      >
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message..."
-          disabled={isStreaming}
-          className="flex-1"
-        />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={isStreaming || !input.trim()}
-        >
-          <Send className="w-4 h-4" />
-        </Button>
-      </form>
-    </div>
+          {/* Messages */}
+          <Messages
+            messages={messages}
+            provider={provider}
+            messagesEndRef={messagesEndRef}
+          />
+        </div>
+        <div className="sticky bottom-0 w-full flex justify-center">
+          <form
+            onSubmit={handleSubmit}
+            className="min-w-3xl bg-secondary rounded-2xl mb-4"
+          >
+            <div className="w-full flex flex-1 flex-col gap-3 px-5 py-4">
+              <textarea
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={
+                  messages.length > 0 ? "Reply..." : "How can I help you today?"
+                }
+                // type="text"
+                disabled={isStreaming}
+                className="flex-1 focus:outline-none field-sizing-content overflow-y-auto max-h-96 resize-none"
+              />
+              <div className="w-full flex justify-end gap-3">
+                <ModelSelector
+                  model={model}
+                  setModel={setModel}
+                  provider={provider}
+                  setProvider={setProvider}
+                  isStreaming={isStreaming}
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  variant="outline"
+                  disabled={isStreaming || !input.trim()}
+                  className="rounded-full"
+                >
+                  {isStreaming ? (
+                    <Square className="w-4 h-4" />
+                  ) : (
+                    <ArrowUp className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
   );
 }
